@@ -1,8 +1,8 @@
 flask==2.3.3
 werkzeug==2.3.7
-langchain==0.0.267
-openai==0.28.0
-python-dotenv==0.19.0
+langchain
+langchain-openai
+openai>=1.0.0
 boto3==1.28.0
 chromadb
 pypdf==3.9.0

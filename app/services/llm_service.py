@@ -5,6 +5,7 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
 
+
 # IMPORT FROM LANGCHAIN_CLASSIC HERE
 from langchain_classic.chains import (
     create_history_aware_retriever,
@@ -126,4 +127,5 @@ if __name__ == "__main__":
     a2 = service.ask(session_id=session_id, question=q2)
     print(f"AI: {a2}\n")
     
-    print("--- Test Complete ---")
+    print("--- Test Complete ---") 
+    

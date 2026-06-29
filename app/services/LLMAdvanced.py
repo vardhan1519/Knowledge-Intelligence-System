@@ -20,7 +20,7 @@ class AutomatedLLMService:
         # Node 1: Contextualize
         contextualize_q_prompt = ChatPromptTemplate.from_messages([
             ("system", "Given a chat history and the latest user question, formulate a standalone question which can be understood without the chat history."),
-            MessagesPlaceholder("messages"), 
+            MessagesPlaceholder("messages"),  
         ])
         rewrite_chain = contextualize_q_prompt | self.llm
         

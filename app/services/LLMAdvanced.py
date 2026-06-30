@@ -1,4 +1,5 @@
 from typing import Dict, Any, List
+import os
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langgraph.graph import StateGraph, START, END, MessagesState  # <-- Everything grouped here
@@ -9,6 +10,7 @@ from langchain_core.runnables import RunnableConfig
 # 1. Correctly declare custom keys alongside the internal MessagesState
 class CustomState(MessagesState):
     context: str
+    sources: List[str]
 
 class AutomatedLLMService:
     def __init__(self, vector_store):
@@ -33,7 +35,16 @@ class AutomatedLLMService:
             docs = self.retriever.invoke(str(rewritten_q))
             context_text = "\n\n".join(doc.page_content for doc in docs)
             
-            return {"context": context_text}
+            # Extract unique source filenames
+            sources = []
+            for doc in docs:
+                source = doc.metadata.get("source", "Unknown")
+                if source and ("/" in source or "\\" in source):
+                    source = os.path.basename(source)
+                if source not in sources:
+                    sources.append(source)
+            
+            return {"context": context_text, "sources": sources}
 
         # Node 2: Answer
         qa_prompt = ChatPromptTemplate.from_messages([
@@ -62,7 +73,7 @@ class AutomatedLLMService:
         memory = MemorySaver()
         return workflow.compile(checkpointer=memory)
 
-    def ask(self, session_id: str, question: str) -> str:
+    def ask(self, session_id: str, question: str) -> Dict[str, Any]:
         config: RunnableConfig = {"configurable": {"thread_id": session_id}}
         
         # Pass input as standard payload matching the graph expects
@@ -71,7 +82,10 @@ class AutomatedLLMService:
             config=config
         )
         
-        return result["messages"][-1].content
+        return {
+            "answer": result["messages"][-1].content,
+            "sources": result.get("sources", [])
+        }
 
 
 # --- TEST EXECUTION BLOCK ---

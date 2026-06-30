@@ -682,3 +682,31 @@ body {
         max-width: 90%;
     }
 }
+
+/* Source attribution styles */
+.message-sources {
+    margin-top: 0.75rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border-color);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sources-title {
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.source-tag {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    padding: 0.15rem 0.4rem;
+    border-radius: 0.25rem;
+    font-family: monospace;
+    font-size: 0.75rem;
+    color: var(--text-primary);
+}

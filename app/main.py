@@ -4,7 +4,7 @@ from app.services.LLMAdvanced import AutomatedLLMService
 from app.config import Config
 import os
 from langchain_community.document_loaders import TextLoader, PyPDFLoader, UnstructuredWordDocumentLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
 import logging
 import tempfile
 from flask import Flask, request, render_template, jsonify
@@ -54,11 +54,16 @@ def process_documents(file):
         else:
             raise ValueError("Unsupported file type")
 
-        # Load and split the document into chunks
-        documents = loader.load()
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-        chunks = text_splitter.split_documents(documents)
-        return chunks
+        # Load all pages and combine them into a single string to treat the document as one chunk
+        pages = loader.load()
+        combined_content = "\n\n".join(page.page_content for page in pages)
+        
+        # Create a single Document chunk preserving the actual source filename
+        chunk = Document(
+            page_content=combined_content,
+            metadata={"source": file.filename}
+        )
+        return [chunk]
         
     finally:
         # Clean up the temporary file
@@ -79,10 +84,9 @@ def upload_file():
     
     try:
         chunks = process_documents(file)
-        texts = [chunk.page_content for chunk in chunks]
-        if texts:
-            vector_store.add_document(texts)
-            return jsonify({"message": f"Successfully processed '{file.filename}' and added {len(texts)} chunks to knowledge base."})
+        if chunks:
+            vector_store.add_document(chunks)
+            return jsonify({"message": f"Successfully processed '{file.filename}' and added to knowledge base."})
         else:
             return jsonify({"error": "No readable content found in file."}), 400
     except Exception as e:
@@ -99,8 +103,11 @@ def query():
         return jsonify({"error": "No question provided"}), 400
     
     try:
-        response = llm_service.ask(session_id, question)
-        return jsonify({"answer": response})
+        result = llm_service.ask(session_id, question)
+        return jsonify({
+            "answer": result["answer"],
+            "sources": result["sources"]
+        })
     except Exception as e:
         logger.exception("Failed to query RAG model")
         return jsonify({"error": f"Query execution failed: {str(e)}"}), 500

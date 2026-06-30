@@ -9,7 +9,7 @@ class VectorStore:
         self.vector_store = Chroma(embedding_function=self.embeddings, persist_directory=path)
 
     def add_document(self, documents):
-        self.vector_store.add_texts(documents)
+        self.vector_store.add_documents(documents)
 
     def search(self, query: str, k: int = 5):
         return self.vector_store.similarity_search(query, k=k)

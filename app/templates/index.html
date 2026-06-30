@@ -299,7 +299,7 @@
                     const result = await response.json();
 
                     if (response.ok) {
-                        appendMessage(result.answer, 'bot');
+                        appendMessage(result.answer, 'bot', result.sources);
                     } else {
                         appendMessage(`Error: ${result.error || 'Failed to get a response.'}`, 'bot error-msg');
                     }
@@ -312,7 +312,7 @@
                 }
             });
 
-            function appendMessage(text, sender) {
+            function appendMessage(text, sender, sources = []) {
                 // Remove welcome message if still present
                 const welcome = messagesContainer.querySelector('.welcome-message');
                 if (welcome) {
@@ -336,6 +336,15 @@
                     .replace(/\*(.*?)\*/g, '<em>$1</em>');
                 
                 contentDiv.innerHTML = formattedText;
+
+                // Add sources if present and sender is bot
+                if (sources && sources.length > 0) {
+                    const sourcesDiv = document.createElement('div');
+                    sourcesDiv.className = 'message-sources';
+                    sourcesDiv.innerHTML = `<span class="sources-title"><i class="fa-solid fa-folder-open"></i> Sources:</span> ` + 
+                        sources.map(src => `<span class="source-tag">${src}</span>`).join(' ');
+                    contentDiv.appendChild(sourcesDiv);
+                }
 
                 msgDiv.appendChild(avatar);
                 msgDiv.appendChild(contentDiv);

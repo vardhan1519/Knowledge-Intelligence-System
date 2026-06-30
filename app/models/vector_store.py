@@ -13,3 +13,6 @@ class VectorStore:
 
     def search(self, query: str, k: int = 5):
         return self.vector_store.similarity_search(query, k=k)
+
+    def as_retriever(self, **kwargs):
+        return self.vector_store.as_retriever(**kwargs)

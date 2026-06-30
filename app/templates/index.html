@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Knowledge Intelligence System - A modern Retrieval-Augmented Generation (RAG) platform to chat with your documents.">
+    <title>Knowledge Intelligence System - RAG Portal</title>
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Local Stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar / Control Panel -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="logo-icon">
+                    <i class="fa-solid fa-brain-circuit"></i>
+                </div>
+                <h1>Knowledge OS</h1>
+            </div>
+
+            <div class="sidebar-section">
+                <h2><i class="fa-solid fa-cloud-arrow-up"></i> Ingest Document</h2>
+                <p class="section-desc">Upload a PDF or TXT document to enrich the vector database knowledge base.</p>
+                
+                <form id="upload-form" class="upload-area">
+                    <input type="file" id="file-input" name="file" accept=".pdf,.txt,.docx" hidden>
+                    <label for="file-input" class="dropzone" id="dropzone">
+                        <i class="fa-solid fa-file-pdf file-icon pdf"></i>
+                        <i class="fa-solid fa-file-lines file-icon txt"></i>
+                        <span>Drag & Drop your file or <span class="browse-btn">Browse</span></span>
+                        <span class="file-limits">PDF, TXT, or DOCX (Max 10MB)</span>
+                    </label>
+                    
+                    <div id="selected-file-container" class="selected-file-container hidden">
+                        <div class="file-details">
+                            <i class="fa-solid fa-file-lines doc-icon"></i>
+                            <div class="file-info">
+                                <span id="file-name" class="file-name">document.pdf</span>
+                                <span id="file-size" class="file-size">1.2 MB</span>
+                            </div>
+                        </div>
+                        <button type="button" id="remove-file-btn" class="icon-btn-danger" title="Remove file">
+                            <i class="fa-solid fa-times"></i>
+                        </button>
+                    </div>
+
+                    <button type="submit" id="upload-submit-btn" class="btn btn-primary btn-block" disabled>
+                        <i class="fa-solid fa-bolt"></i> Upload and Index
+                    </button>
+                </form>
+            </div>
+
+            <div class="sidebar-section">
+                <h2><i class="fa-solid fa-circle-info"></i> System Information</h2>
+                <div class="info-card">
+                    <div class="info-row">
+                        <span class="info-label">Status:</span>
+                        <span class="status-indicator online">Online</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Engine:</span>
+                        <span>LangChain &amp; OpenAI</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Vector Store:</span>
+                        <span>ChromaDB</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="sidebar-footer">
+                <p>&copy; 2026 Knowledge OS</p>
+            </div>
+        </aside>
+
+        <!-- Main Chat / Query Area -->
+        <main class="chat-area">
+            <!-- Top bar -->
+            <header class="chat-header">
+                <div class="header-title-wrapper">
+                    <h2>RAG Playground</h2>
+                    <p>Ask questions informed by your uploaded documents.</p>
+                </div>
+                <div class="session-badge">
+                    <i class="fa-solid fa-key"></i>
+                    <span>Session: <strong id="session-id-display">default-session</strong></span>
+                </div>
+            </header>
+
+            <!-- Messages Window -->
+            <div class="messages-container" id="messages-container">
+                <div class="welcome-message">
+                    <div class="welcome-icon">
+                        <i class="fa-solid fa-quote-right"></i>
+                    </div>
+                    <h3>Welcome to Knowledge OS RAG</h3>
+                    <p>Start by uploading a document in the sidebar to populate the vector store, then ask questions here. The AI will retrieve the most relevant information to answer your query.</p>
+                    <div class="suggested-queries">
+                        <button class="suggested-query-btn" onclick="setQuery('What does this document cover?')">"What does this document cover?"</button>
+                        <button class="suggested-query-btn" onclick="setQuery('Summarize the key points of the uploaded document.')">"Summarize the key points..."</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loader Indicator -->
+            <div id="rag-loader" class="rag-loader hidden">
+                <div class="spinner"></div>
+                <span>Retrieving context and formulating answer...</span>
+            </div>
+
+            <!-- Query Input Bar -->
+            <footer class="chat-input-container">
+                <form id="query-form" class="query-form">
+                    <textarea 
+                        id="query-input" 
+                        placeholder="Ask a question about your documents..." 
+                        rows="1" 
+                        required
+                    ></textarea>
+                    <button type="submit" id="query-send-btn" class="send-btn" title="Send question">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </form>
+            </footer>
+        </main>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast hidden">
+        <i class="toast-icon fa-solid fa-circle-check"></i>
+        <span id="toast-message">Success! File uploaded successfully.</span>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const uploadForm = document.getElementById('upload-form');
+            const fileInput = document.getElementById('file-input');
+            const dropzone = document.getElementById('dropzone');
+            const selectedFileContainer = document.getElementById('selected-file-container');
+            const fileNameDisplay = document.getElementById('file-name');
+            const fileSizeDisplay = document.getElementById('file-size');
+            const removeFileBtn = document.getElementById('remove-file-btn');
+            const uploadSubmitBtn = document.getElementById('upload-submit-btn');
+
+            const queryForm = document.getElementById('query-form');
+            const queryInput = document.getElementById('query-input');
+            const messagesContainer = document.getElementById('messages-container');
+            const ragLoader = document.getElementById('rag-loader');
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+
+            const sessionId = 'session_' + Math.random().toString(36).substring(2, 10);
+            document.getElementById('session-id-display').textContent = sessionId;
+
+            // --- Auto-expand textarea ---
+            queryInput.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = (this.scrollHeight) + 'px';
+            });
+
+            queryInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    queryForm.dispatchEvent(new Event('submit'));
+                }
+            });
+
+            // --- Dropzone Event Listeners ---
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropzone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropzone.classList.add('dragover');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropzone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropzone.classList.remove('dragover');
+                }, false);
+            });
+
+            dropzone.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                if (files.length) {
+                    fileInput.files = files;
+                    handleFileSelection(files[0]);
+                }
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                if (fileInput.files.length) {
+                    handleFileSelection(fileInput.files[0]);
+                }
+            });
+
+            removeFileBtn.addEventListener('click', () => {
+                fileInput.value = '';
+                selectedFileContainer.classList.add('hidden');
+                dropzone.classList.remove('hidden');
+                uploadSubmitBtn.disabled = true;
+            });
+
+            function handleFileSelection(file) {
+                fileNameDisplay.textContent = file.name;
+                fileSizeDisplay.textContent = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+                dropzone.classList.add('hidden');
+                selectedFileContainer.classList.remove('hidden');
+                uploadSubmitBtn.disabled = false;
+            }
+
+            // --- Show Toast Notification ---
+            function showToast(message, isError = false) {
+                toastMessage.textContent = message;
+                const icon = toast.querySelector('.toast-icon');
+                if (isError) {
+                    toast.classList.add('error');
+                    icon.className = 'toast-icon fa-solid fa-circle-xmark';
+                } else {
+                    toast.classList.remove('error');
+                    icon.className = 'toast-icon fa-solid fa-circle-check';
+                }
+                toast.classList.remove('hidden');
+                setTimeout(() => {
+                    toast.classList.add('hidden');
+                }, 4000);
+            }
+
+            // --- File Upload Handler ---
+            uploadForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (!fileInput.files.length) return;
+
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+                
+                uploadSubmitBtn.disabled = true;
+                uploadSubmitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Indexing File...';
+
+                try {
+                    const response = await fetch('/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        showToast(result.message || 'File uploaded and indexed successfully!');
+                        // Reset form
+                        fileInput.value = '';
+                        selectedFileContainer.classList.add('hidden');
+                        dropzone.classList.remove('hidden');
+                    } else {
+                        showToast(result.error || 'Failed to upload document', true);
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    showToast('Network error while uploading file.', true);
+                } finally {
+                    uploadSubmitBtn.disabled = true;
+                    uploadSubmitBtn.innerHTML = '<i class="fa-solid fa-bolt"></i> Upload and Index';
+                }
+            });
+
+            // --- Query Submission Handler ---
+            queryForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const question = queryInput.value.trim();
+                if (!question) return;
+
+                // Add User Message to Chat
+                appendMessage(question, 'user');
+                queryInput.value = '';
+                queryInput.style.height = 'auto';
+
+                // Show Loader
+                ragLoader.classList.remove('hidden');
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+                try {
+                    const response = await fetch('/query', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            question: question,
+                            session_id: sessionId
+                        })
+                    });
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        appendMessage(result.answer, 'bot');
+                    } else {
+                        appendMessage(`Error: ${result.error || 'Failed to get a response.'}`, 'bot error-msg');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    appendMessage('Network error. Failed to reach RAG server.', 'bot error-msg');
+                } finally {
+                    ragLoader.classList.add('hidden');
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }
+            });
+
+            function appendMessage(text, sender) {
+                // Remove welcome message if still present
+                const welcome = messagesContainer.querySelector('.welcome-message');
+                if (welcome) {
+                    welcome.remove();
+                }
+
+                const msgDiv = document.createElement('div');
+                msgDiv.className = `message ${sender}-message`;
+                
+                const avatar = document.createElement('div');
+                avatar.className = 'message-avatar';
+                avatar.innerHTML = sender === 'user' ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-robot"></i>';
+
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'message-content';
+                
+                // Formatted paragraphs/lists support for simple output styling
+                const formattedText = text
+                    .replace(/\n/g, '<br>')
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>');
+                
+                contentDiv.innerHTML = formattedText;
+
+                msgDiv.appendChild(avatar);
+                msgDiv.appendChild(contentDiv);
+                
+                messagesContainer.appendChild(msgDiv);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+
+            window.setQuery = function(queryText) {
+                queryInput.value = queryText;
+                queryInput.style.height = 'auto';
+                queryInput.style.height = (queryInput.scrollHeight) + 'px';
+                queryInput.focus();
+            };
+        });
+    </script>
+</body>
+</html>
